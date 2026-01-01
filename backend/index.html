@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Quiz Tool - District Safe</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background: #f5f7fa; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+        header { background: #2c5282; color: white; padding: 25px; text-align: center; }
+        h1 { margin-bottom: 10px; }
+        .subtitle { opacity: 0.9; font-size: 14px; }
+        .content { padding: 30px; }
+        
+        .upload-area { border: 3px dashed #cbd5e0; border-radius: 10px; padding: 40px; text-align: center; margin: 20px 0; cursor: pointer; transition: all 0.3s; }
+        .upload-area:hover { border-color: #2c5282; background: #f8fbff; }
+        .upload-icon { font-size: 50px; color: #2c5282; margin-bottom: 15px; }
+        
+        .progress { display: none; margin: 20px 0; }
+        .progress-bar { height: 20px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #2c5282; width: 0%; transition: width 0.3s; }
+        
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0; }
+        .feature { background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #2c5282; }
+        
+        .btn { background: #2c5282; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; margin: 10px 5px; }
+        .btn:hover { background: #2d3748; }
+        .btn-secondary { background: #718096; }
+        
+        .status { padding: 15px; border-radius: 6px; margin: 20px 0; display: none; }
+        .status.success { background: #c6f6d5; color: #22543d; border: 1px solid #9ae6b4; }
+        .status.error { background: #fed7d7; color: #742a2a; border: 1px solid #fc8181; }
+        
+        .result { display: none; margin-top: 30px; padding: 20px; background: #f0fff4; border-radius: 8px; border: 2px solid #38a169; }
+        
+        @media (max-width: 768px) {
+            .features { grid-template-columns: 1fr; }
+            .content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Teacher Quiz Tool</h1>
+            <div class="subtitle">Safe for District Computers • No Installation Required</div>
+        </header>
+        
+        <div class="content">
+            <h2>Create Quizzes from Word Documents</h2>
+            <p>Upload your Word document (.doc or .docx) to generate professional quizzes.</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📄</div>
+                <h3>Drag & Drop Word Document Here</h3>
+                <p>or click to browse</p>
+                <p style="font-size: 14px; color: #718096; margin-top: 10px;">Supported: .doc, .docx files</p>
+                <input type="file" id="fileInput" accept=".doc,.docx" style="display: none;">
+            </div>
+            
+            <div class="progress" id="progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p id="progressText" style="text-align: center; margin-top: 10px;"></p>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <h4>📄 Word Processing</h4>
+                    <p>Extract text, images, and tables from Word documents</p>
+                </div>
+                <div class="feature">
+                    <h4>🎨 Professional PDFs</h4>
+                    <p>Generate beautiful, printable quiz PDFs</p>
+                </div>
+                <div class="feature">
+                    <h4>🤖 AI Enhancement</h4>
+                    <p>Improve questions with AI (optional)</p>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <button class="btn" id="processBtn" disabled>Process Document</button>
+                <button class="btn btn-secondary" id="demoBtn">Load Demo</button>
+                <button class="btn btn-secondary" id="resetBtn">Reset</button>
+            </div>
+            
+            <div class="status" id="status"></div>
+            
+            <div class="result" id="result">
+                <h3>✅ Document Processed Successfully!</h3>
+                <p>Your quiz is ready. Next steps:</p>
+                <div style="margin: 20px 0;">
+                    <button class="btn" id="downloadPdfBtn">Download PDF Quiz</button>
+                    <button class="btn btn-secondary" id="previewBtn">Preview Quiz</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; padding: 20px; background: #e6fffa; border-radius: 8px;">
+                <h4>💡 How This Works:</h4>
+                <p>1. Upload Word document → 2. Processing happens on secure server → 3. Download PDF → 4. Print on district computers</p>
+                <p style="margin-top: 10px; font-size: 14px; color: #666;">Student data never leaves your computer. Only quiz content is processed.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get DOM elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const progress = document.getElementById('progress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        const demoBtn = document.getElementById('demoBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        
+        let currentFile = null;
+        
+        // Event Listeners
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#2c5282';
+            uploadArea.style.backgroundColor = '#f8fbff';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#cbd5e0';
+            uploadArea.style.backgroundColor = 'white';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#cbd5e0';
+            uploadArea.style.backgroundColor = 'white';
+            
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        processBtn.addEventListener('click', processDocument);
+        demoBtn.addEventListener('click', loadDemo);
+        resetBtn.addEventListener('click', resetAll);
+        
+        // Functions
+        function handleFile(file) {
+            // Check file type
+            if (!file.name.match(/\.(doc|docx)$/i)) {
+                showStatus('Please select a Word document (.doc or .docx)', 'error');
+                return;
+            }
+            
+            // Check file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                showStatus('File too large. Max size is 10MB.', 'error');
+                return;
+            }
+            
+            currentFile = file;
+            processBtn.disabled = false;
+            
+            // Update UI
+            uploadArea.innerHTML = `
+                <div class="upload-icon">✅</div>
+                <h3>${file.name}</h3>
+                <p>${formatFileSize(file.size)} • Ready to process</p>
+                <button class="btn" onclick="document.getElementById('fileInput').click()" style="margin-top: 10px;">
+                    Choose Different File
+                </button>
+            `;
+            
+            showStatus('Document ready. Click "Process Document" to continue.', 'success');
+        }
+        
+        async function processDocument() {
+            if (!currentFile) return;
+            
+            // Show progress
+            progress.style.display = 'block';
+            progressFill.style.width = '30%';
+            progressText.textContent = 'Uploading to server...';
+            processBtn.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('file', currentFile);
+            
+            try {
+                // IMPORTANT: Replace with your Render.com URL after deployment
+                const backendUrl = 'https://teacher-quiz-tool.onrender.com';
+                
+                // Test connection first
+                progressFill.style.width = '50%';
+                progressText.textContent = 'Connecting to server...';
+                
+                const testResponse = await fetch(backendUrl);
+                if (!testResponse.ok) {
+                    throw new Error('Server not responding. Deploying may take a few minutes.');
+                }
+                
+                // Upload file
+                progressFill.style.width = '70%';
+                progressText.textContent = 'Processing document...';
+                
+                const response = await fetch(`${backendUrl}/api/upload-word`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`Server error: ${error}`);
+                }
+                
+                // Success
+                progressFill.style.width = '100%';
+                progressText.textContent = 'Complete!';
+                
+                const data = await response.json();
+                
+                // Show result
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                    result.style.display = 'block';
+                    showStatus(`Processed ${data.content?.length || 0} items from document`, 'success');
+                }, 1000);
+                
+            } catch (error) {
+                progressText.textContent = 'Error';
+                showStatus(`Processing failed: ${error.message}`, 'error');
+                processBtn.disabled = false;
+                
+                // Reset progress after error
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                    progressFill.style.width = '0%';
+                }, 3000);
+            }
+        }
+        
+        function loadDemo() {
+            // Create a demo file
+            const demoContent = `This is a demo Word document content.
+            
+1. What is the capital of France?
+A) London
+B) Berlin
+C) Paris*
+D) Madrid
+
+2. Which planet is known as the Red Planet?
+A) Venus
+B) Mars √
+C) Jupiter
+D) Saturn
+
+3. Photosynthesis produces:
+A) Oxygen*
+B) Carbon Dioxide
+C) Nitrogen
+D) Hydrogen`;
+            
+            const demoFile = new File([demoContent], "demo_quiz.docx", {
+                type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            });
+            
+            handleFile(demoFile);
+            showStatus('Demo loaded. Click "Process Document".', 'success');
+        }
+        
+        function resetAll() {
+            currentFile = null;
+            processBtn.disabled = true;
+            progress.style.display = 'none';
+            result.style.display = 'none';
+            status.style.display = 'none';
+            progressFill.style.width = '0%';
+            
+            uploadArea.innerHTML = `
+                <div class="upload-icon">📄</div>
+                <h3>Drag & Drop Word Document Here</h3>
+                <p>or click to browse</p>
+                <p style="font-size: 14px; color: #718096; margin-top: 10px;">Supported: .doc, .docx files</p>
+                <input type="file" id="fileInput" accept=".doc,.docx" style="display: none;">
+            `;
+            
+            // Re-attach event listeners
+            fileInput.value = '';
+        }
+        
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            showStatus('Ready to upload Word documents. Drag & drop or click above.', 'success');
+        });
+    </script>
+</body>
+</html>
