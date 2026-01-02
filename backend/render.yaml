@@ -2,11 +2,12 @@ services:
   - type: web
     name: teacher-quiz-tool
     runtime: python
-    buildCommand: cd backend && pip install -r requirements.txt
-    startCommand: cd backend && uvicorn app:app --host 0.0.0.0 --port 8000
+    rootDirectory: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: OPENAI_API_KEY
-        sync: false
+      - key: PORT
+        value: 10000
       - key: SECRET_KEY
         generateValue: true
     plan: starter
