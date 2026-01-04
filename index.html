@@ -113,6 +113,20 @@
 
         .form-group {
             margin-bottom: 1.2rem;
+            /* Container for all options in a question */
+.options-container {
+    display: flex;
+    flex-wrap: wrap;  /* Allows wrapping to next line if needed */
+    gap: 15px;        /* Space between options */
+    margin-top: 10px;
+}
+
+/* For the option text inputs */
+.option-text {
+    width: 100%;      /* Fill available space */
+    min-width: 120px; /* Minimum width */
+    max-width: 220px; /* Maximum width */
+}
         }
 
         label {
