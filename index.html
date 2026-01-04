@@ -204,10 +204,22 @@
         }
 
         .option {
-            display: flex;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
+    display: inline-block;  /* Changed from flex to inline-block */
+    margin-right: 20px;     /* Space between options */
+    margin-bottom: 10px;    /* Space between rows */
+    vertical-align: top;    /* Align options at top */
+    min-width: 150px;       /* Minimum width for each option */
+    max-width: 250px;       /* Maximum width before wrapping */
+}
+
+/* For mobile/small screens, stack vertically */
+@media (max-width: 768px) {
+    .option {
+        display: block;
+        margin-right: 0;
+        width: 100%;
+    }
+}
 
         .option input[type="radio"] {
             margin-right: 10px;
