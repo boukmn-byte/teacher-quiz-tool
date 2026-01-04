@@ -1,4 +1,4 @@
-### COMPLETE NEW app.py - WITH POSTGRESQL DATABASE ###
+### COMPLETE UPDATED app.py - WITH QUESTION TYPE SUPPORT ###
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="Teacher Quiz Tool API", version="2.0.0")
+app = FastAPI(title="Teacher Quiz Tool API", version="2.1.0")
 
 # CORS Configuration
 app.add_middleware(
@@ -31,13 +31,13 @@ app.add_middleware(
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/quizdb")
 pool = None
 
-# Data Models
+# Data Models - UPDATED FOR QUESTION TYPES
 class Question(BaseModel):
     question: str
     options: List[str]
     correct: int
-    question_type: str = "multiple_choice"  # New field: multiple_choice, true_false, image_based
-    image_url: Optional[str] = None  # For image-based questions
+    question_type: str = "multiple_choice"  # New: multiple_choice, true_false, image_based
+    image_url: Optional[str] = None  # New: for image-based questions
 
 class Quiz(BaseModel):
     title: str
@@ -57,8 +57,9 @@ async def get_db_pool():
     return pool
 
 async def create_tables():
-    """Create necessary database tables"""
+    """Create database tables with question type support"""
     async with (await get_db_pool()).acquire() as conn:
+        # Create quizzes table
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS quizzes (
                 id TEXT PRIMARY KEY,
@@ -68,12 +69,13 @@ async def create_tables():
             )
         ''')
         
+        # Create questions table WITH question_type and image_url
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS questions (
                 id SERIAL PRIMARY KEY,
                 quiz_id TEXT REFERENCES quizzes(id) ON DELETE CASCADE,
                 question_text TEXT NOT NULL,
-                options TEXT[],  -- Array of options
+                options TEXT[],
                 correct_index INTEGER,
                 question_type TEXT DEFAULT 'multiple_choice',
                 image_url TEXT
@@ -91,7 +93,7 @@ async def read_root():
     return {
         "message": "Teacher Quiz Tool API", 
         "status": "OK", 
-        "version": "2.0.0",
+        "version": "2.1.0",
         "features": ["PostgreSQL", "Multiple Question Types", "Image Support"]
     }
 
@@ -102,13 +104,24 @@ async def health():
         async with pool.acquire() as conn:
             await conn.execute("SELECT 1")
             db_status = "healthy"
-    except:
-        db_status = "unhealthy"
+            # Count total questions by type
+            counts = await conn.fetchrow('''
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN question_type = 'multiple_choice' THEN 1 END) as multiple_choice,
+                    COUNT(CASE WHEN question_type = 'true_false' THEN 1 END) as true_false,
+                    COUNT(CASE WHEN question_type = 'image_based' THEN 1 END) as image_based
+                FROM questions
+            ''')
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+        counts = None
     
     return {
         "status": "healthy", 
         "database": db_status,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "question_stats": dict(counts) if counts else {}
     }
 
 @app.get("/api/quizzes", response_model=List[QuizResponse])
@@ -123,7 +136,7 @@ async def get_all_quizzes():
         for quiz in quizzes:
             # Get questions for this quiz
             questions_data = await conn.fetch(
-                "SELECT question_text, options, correct_index, question_type, image_url FROM questions WHERE quiz_id = $1",
+                "SELECT question_text, options, correct_index, question_type, image_url FROM questions WHERE quiz_id = $1 ORDER BY id",
                 quiz['id']
             )
             
@@ -157,7 +170,7 @@ async def get_quiz(quiz_id: str):
             raise HTTPException(status_code=404, detail="Quiz not found")
         
         questions_data = await conn.fetch(
-            "SELECT question_text, options, correct_index, question_type, image_url FROM questions WHERE quiz_id = $1",
+            "SELECT question_text, options, correct_index, question_type, image_url FROM questions WHERE quiz_id = $1 ORDER BY id",
             quiz_id
         )
         
@@ -181,7 +194,7 @@ async def get_quiz(quiz_id: str):
 
 @app.post("/api/quizzes", response_model=dict)
 async def create_quiz(quiz: Quiz):
-    """Save a new quiz to database"""
+    """Save a new quiz to database with question types"""
     pool = await get_db_pool()
     quiz_id = str(uuid.uuid4())
     
@@ -193,7 +206,7 @@ async def create_quiz(quiz: Quiz):
                 quiz_id, quiz.title, quiz.description
             )
             
-            # Insert questions
+            # Insert questions with type support
             for question in quiz.questions:
                 await conn.execute(
                     """INSERT INTO questions 
@@ -203,14 +216,15 @@ async def create_quiz(quiz: Quiz):
                     question.question,
                     question.options,
                     question.correct,
-                    question.question_type,
+                    question.question_type or "multiple_choice",  # Default if missing
                     question.image_url
                 )
     
     return {
         "message": "Quiz saved to database!", 
         "id": quiz_id, 
-        "question_count": len(quiz.questions)
+        "question_count": len(quiz.questions),
+        "features": "Supports multiple question types"
     }
 
 @app.delete("/api/quizzes/{quiz_id}")
@@ -224,4 +238,23 @@ async def delete_quiz(quiz_id: str):
             return {"message": "Quiz deleted successfully"}
         else:
             raise HTTPException(status_code=404, detail="Quiz not found")
-### END OF NEW app.py ###
+
+# New endpoint: Get question type statistics
+@app.get("/api/stats/question-types")
+async def get_question_stats():
+    """Get statistics about question types in database"""
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        stats = await conn.fetchrow('''
+            SELECT 
+                COUNT(*) as total_questions,
+                COUNT(CASE WHEN question_type = 'multiple_choice' THEN 1 END) as multiple_choice,
+                COUNT(CASE WHEN question_type = 'true_false' THEN 1 END) as true_false,
+                COUNT(CASE WHEN question_type = 'image_based' THEN 1 END) as image_based,
+                COUNT(CASE WHEN image_url IS NOT NULL THEN 1 END) as with_images
+            FROM questions
+        ''')
+        
+        return dict(stats) if stats else {}
+
+### END OF UPDATED app.py ###
